@@ -1,5 +1,4 @@
-﻿using SoundFlow.Abstracts;
-using SoundFlow.Backends.MiniAudio;
+﻿using SoundFlow.Backends.MiniAudio;
 using SoundFlow.Components;
 using SoundFlow.Providers;
 using SoundFlow.Enums;
@@ -10,7 +9,7 @@ if (args.Length == 0)
     Console.WriteLine("Error: Please provide the path to an audio file as a command-line argument.");
     return 1; // Return a non-zero exit code for error
 }
-string audioFilePath = args[0];
+var audioFilePath = args[0];
 
 if (!File.Exists(audioFilePath))
 {
@@ -31,7 +30,7 @@ try
     player.Play();
     Console.WriteLine("Playback started. Waiting for audio to finish...");
 
-    while (player.IsPlaying)
+    while (player.State == PlaybackState.Playing)
     {
         Thread.Sleep(100); // Avoid busy-waiting
     }
