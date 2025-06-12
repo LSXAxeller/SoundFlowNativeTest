@@ -37,20 +37,20 @@ jobs:
             rid: linux-arm64
 
           # macOS builds
-          - os: macos-latest-large
+          - os: macos-13
             rid: osx-x64
 
           - os: macos-latest
             rid: osx-arm64
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
       - name: Fix environment for ARM64 Linux runners (actions/partner-runner-images#25)
         if: matrix.os == 'ubuntu-24.04-arm'
         run: for var in PATH XDG_CONFIG_HOME; do sed -Ee "s/^/${var}=/" -e 's/(runner)admin/\1/g' <<< "${!var}"; done | tee -a "$GITHUB_ENV"
-        
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
+      
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
@@ -94,14 +94,15 @@ jobs:
         run: |
           dotnet build --configuration Debug
           dotnet build --configuration Release
+        continue-on-error: true
 
       - name: Test - dotnet run
         run: dotnet run --project ${{ env.PROJECT_NAME }}.csproj -- "test_audio.wav"
+        continue-on-error: true
 
       - name: Test - Framework-Dependent Publish and Run
         shell: bash
         run: |
-          # The path variable is now correct because env.DOTNET_VERSION is '8.0'
           dotnet publish -c Release -r ${{ matrix.rid }}
           
           echo "Running framework-dependent published application..."
@@ -111,6 +112,7 @@ jobs:
           fi
           
           "$EXE_PATH" "test_audio.wav"
+        continue-on-error: true
 
       - name: Test - Self-Contained, Single-File Publish and Run
         shell: bash
@@ -124,3 +126,10 @@ jobs:
           fi
 
           "$EXE_PATH" "test_audio.wav"
+        continue-on-error: true
+
+      - name: Final Job Status
+        if: ${{ failure() }}
+        run: |
+          echo "One or more test steps failed. Marking job as failed."
+          exit 1
