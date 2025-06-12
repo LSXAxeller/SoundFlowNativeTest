@@ -1,0 +1,121 @@
+name: Build and Test SoundFlow example
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PROJECT_NAME: MySoundApp
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build-and-run:
+    name: Test on ${{ matrix.os }} (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    
+    defaults:
+      run:
+        working-directory: MySoundApp
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows builds
+          - os: windows-latest
+            rid: win-x64
+
+          - os: windows-latest
+            rid: win-x86
+
+          # Linux builds
+          - os: ubuntu-latest
+            rid: linux-x64
+
+          - os: ubuntu-latest
+            rid: linux-arm64
+
+          # macOS builds
+          - os: macos-latest
+            rid: osx-x64
+
+          - os: macos-latest
+            rid: osx-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Setup Steps
+      - name: Setup Virtual Audio Device (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pulseaudio
+          pulseaudio -D --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=DummySink
+
+      - name: Setup Virtual Audio Device (macOS)
+        if: runner.os == 'macOS'
+        run: brew install blackhole-2ch
+
+      - name: Setup Virtual Audio Device (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip" -OutFile "vbcable.zip"
+          Expand-Archive -Path "vbcable.zip" -DestinationPath "vbcable"
+          Start-Process -FilePath "vbcable/VBCABLE_Setup_x64.exe" -ArgumentList "/S" -Wait -PassThru
+
+      - name: Create Dummy WAV File for Testing
+        shell: pwsh
+        run: |
+          # Create a short, silent, 16-bit stereo 44.1kHz WAV file
+          $header = [byte[]](0x52,0x49,0x46,0x46,0x24,0x08,0x00,0x00,0x57,0x41,0x56,0x45,0x66,0x6d,0x74,0x20,0x10,0x00,0x00,0x00,0x01,0x00,0x02,0x00,0x44,0xac,0x00,0x00,0x10,0xb1,0x02,0x00,0x04,0x00,0x10,0x00,0x64,0x61,0x74,0x61,0x00,0x08,0x00,0x00)
+          $data = [byte[]](0) * 2048 # ~10ms of silence
+          [IO.File]::WriteAllBytes("test_audio.wav", ($header + $data))
+          echo "Created dummy test_audio.wav"
+
+      # Test Steps
+      - name: Test - dotnet restore
+        run: dotnet restore
+
+      - name: Test - dotnet build (Debug and Release)
+        run: |
+          dotnet build --configuration Debug
+          dotnet build --configuration Release
+
+      - name: Test - dotnet run
+        run: dotnet run --project ${{ env.PROJECT_NAME }}.csproj -- "test_audio.wav"
+
+      - name: Test - Framework-Dependent Publish and Run
+        shell: bash
+        run: |
+          dotnet publish -c Release -r ${{ matrix.rid }}
+          
+          echo "Running framework-dependent published application..."
+          EXE_PATH="./bin/Release/net${{ env.DOTNET_VERSION }}/${{ matrix.rid }}/publish/${{ env.PROJECT_NAME }}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            EXE_PATH="${EXE_PATH}.exe"
+          fi
+          
+          "$EXE_PATH" "test_audio.wav"
+
+      - name: Test - Self-Contained, Single-File Publish and Run
+        shell: bash
+        run: |
+          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:DebugType=None -p:DebugSymbols=false
+
+          echo "Running self-contained published application..."
+          EXE_PATH="./bin/Release/net${{ env.DOTNET_VERSION }}/${{ matrix.rid }}/publish/${{ env.PROJECT_NAME }}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            EXE_PATH="${EXE_PATH}.exe"
+          fi
+
+          "$EXE_PATH" "test_audio.wav"
