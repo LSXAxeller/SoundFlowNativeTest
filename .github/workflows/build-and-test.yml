@@ -7,13 +7,13 @@ on:
 
 env:
   PROJECT_NAME: MySoundApp
-  DOTNET_VERSION: '8.0.x'
+  DOTNET_VERSION: '8.0'
 
 jobs:
   build-and-run:
     name: Test on ${{ matrix.os }} (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
-    
+
     defaults:
       run:
         working-directory: MySoundApp
@@ -71,7 +71,7 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip" -OutFile "vbcable.zip"
           Expand-Archive -Path "vbcable.zip" -DestinationPath "vbcable"
-          Start-Process -FilePath "vbcable/VBCABLE_Setup_x64.exe" -ArgumentList "/S" -Wait -PassThru
+          Start-Process -FilePath "vbcable/VBCABLE_Setup_x64.exe" -ArgumentList "-i -h" -Wait -PassThru
 
       - name: Create Dummy WAV File for Testing
         shell: pwsh
@@ -97,6 +97,7 @@ jobs:
       - name: Test - Framework-Dependent Publish and Run
         shell: bash
         run: |
+          # The path variable is now correct because env.DOTNET_VERSION is '8.0'
           dotnet publish -c Release -r ${{ matrix.rid }}
           
           echo "Running framework-dependent published application..."
