@@ -45,7 +45,7 @@ jobs:
 
     steps:
       - name: Fix environment for ARM64 Linux runners (actions/partner-runner-images#25)
-        if: matix.os == 'ubuntu-24.04-arm'
+        if: matrix.os == 'ubuntu-24.04-arm'
         run: for var in PATH XDG_CONFIG_HOME; do sed -Ee "s/^/${var}=/" -e 's/(runner)admin/\1/g' <<< "${!var}"; done | tee -a "$GITHUB_ENV"
         
       - name: Checkout repository
