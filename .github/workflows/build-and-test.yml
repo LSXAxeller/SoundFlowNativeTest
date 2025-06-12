@@ -33,17 +33,21 @@ jobs:
           - os: ubuntu-latest
             rid: linux-x64
 
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             rid: linux-arm64
 
           # macOS builds
-          - os: macos-latest
+          - os: macos-latest-large
             rid: osx-x64
 
           - os: macos-latest
             rid: osx-arm64
 
     steps:
+      - name: Fix environment for ARM64 Linux runners (actions/partner-runner-images#25)
+        if: matix.os == 'ubuntu-24.04-arm'
+        run: for var in PATH XDG_CONFIG_HOME; do sed -Ee "s/^/${var}=/" -e 's/(runner)admin/\1/g' <<< "${!var}"; done | tee -a "$GITHUB_ENV"
+        
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -69,7 +73,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip" -OutFile "vbcable.zip"
+          Invoke-WebRequest -Uri "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip" -OutFile "vbcable.zip"
           Expand-Archive -Path "vbcable.zip" -DestinationPath "vbcable"
           Start-Process -FilePath "vbcable/VBCABLE_Setup_x64.exe" -ArgumentList "-i -h" -Wait -PassThru
 
