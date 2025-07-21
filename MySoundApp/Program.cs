@@ -2,8 +2,8 @@
 using SoundFlow.Components;
 using SoundFlow.Providers;
 using SoundFlow.Enums;
+using SoundFlow.Structs;
 
-// The path to the audio file will be provided as a command-line argument.
 if (args.Length == 0)
 {
     Console.WriteLine("Error: Please provide the path to an audio file as a command-line argument.");
@@ -19,17 +19,31 @@ if (!File.Exists(audioFilePath))
 
 try
 {
-    Console.WriteLine($"Initializing audio engine...");
-    using var audioEngine = new MiniAudioEngine(48000, Capability.Playback); 
-    Console.WriteLine("Audio engine initialized successfully.");
+    Console.WriteLine("Initializing audio engine context...");
+    using var audioEngine = new MiniAudioEngine();
+    Console.WriteLine("Audio engine context initialized.");
+
+    var audioFormat = new AudioFormat
+    {
+        SampleRate = 48000,
+        Channels = 2,
+        Format = SampleFormat.F32
+    };
+
+    Console.WriteLine("Initializing default playback device...");
+    using var playbackDevice = audioEngine.InitializePlaybackDevice(null, audioFormat);
+    Console.WriteLine($"Device initialized: {playbackDevice.Info?.Name}");
 
     Console.WriteLine($"Loading audio file: {audioFilePath}");
-    var player = new SoundPlayer(new StreamDataProvider(File.OpenRead(audioFilePath)));
-
-    Mixer.Master.AddComponent(player);
+    var dataProvider = new StreamDataProvider(audioEngine, audioFormat, File.OpenRead(audioFilePath));
+    var player = new SoundPlayer(audioEngine, audioFormat, dataProvider);
+    
+    playbackDevice.MasterMixer.AddComponent(player);
+    
+    playbackDevice.Start();
     player.Play();
+    
     Console.WriteLine("Playback started. Waiting for audio to finish...");
-
     while (player.State == PlaybackState.Playing)
     {
         Thread.Sleep(100); // Avoid busy-waiting
@@ -37,7 +51,7 @@ try
 
     Console.WriteLine("Playback finished.");
     player.Stop();
-    Mixer.Master.RemoveComponent(player);
+    playbackDevice.MasterMixer.RemoveComponent(player);
 
     Console.WriteLine("Program finished successfully.");
     return 0; // Success
