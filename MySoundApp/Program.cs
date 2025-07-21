@@ -31,7 +31,8 @@ try
     };
 
     Console.WriteLine("Initializing default playback device...");
-    using var playbackDevice = audioEngine.InitializePlaybackDevice(null, audioFormat);
+    var defaultDevice = audioEngine.PlaybackDevices.FirstOrDefault();
+    using var playbackDevice = audioEngine.InitializePlaybackDevice(defaultDevice, audioFormat);
     Console.WriteLine($"Device initialized: {playbackDevice.Info?.Name}");
 
     Console.WriteLine($"Loading audio file: {audioFilePath}");
